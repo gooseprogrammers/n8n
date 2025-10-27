@@ -13,6 +13,8 @@ import type {
 
 import { promptTypeOptions, textFromPreviousNode, textInput } from '@utils/descriptions';
 
+import { claudeCodeAgentProperties } from '../agents/ClaudeCodeAgent/options';
+import { claudeCodeAgentExecute } from '../agents/ClaudeCodeAgent/V1/execute';
 import { conversationalAgentProperties } from '../agents/ConversationalAgent/description';
 import { conversationalAgentExecute } from '../agents/ConversationalAgent/execute';
 import { openAiFunctionsAgentProperties } from '../agents/OpenAiFunctionsAgent/description';
@@ -35,7 +37,8 @@ function getInputs(
 		| 'openAiFunctionsAgent'
 		| 'planAndExecuteAgent'
 		| 'reActAgent'
-		| 'sqlAgent',
+		| 'sqlAgent'
+		| 'claudeCodeAgent',
 	hasOutputParser?: boolean,
 ): Array<NodeConnectionType | INodeInputConfiguration> {
 	interface SpecialInput {
@@ -205,6 +208,9 @@ function getInputs(
 				type: 'ai_outputParser',
 			},
 		];
+	} else if (agent === 'claudeCodeAgent') {
+		// Claude Code Agent uses Anthropic SDK directly, no special inputs needed
+		specialInputs = [];
 	}
 
 	if (hasOutputParser === false) {
@@ -256,6 +262,12 @@ const agentTypeProperty: INodeProperties = {
 			description:
 				'Specializes in interacting with SQL databases. Ideal for data analysis tasks, generating queries, or extracting insights from structured data.',
 		},
+		{
+			name: 'Claude Code Agent',
+			value: 'claudeCodeAgent',
+			description:
+				'Uses Anthropic\'s Claude Agent SDK to provide autonomous capabilities including file operations, code execution, and command running in a sandboxed environment. Requires Anthropic API credentials.',
+		},
 	],
 	default: '',
 };
@@ -297,6 +309,15 @@ export class AgentV1 implements INodeType {
 						show: {
 							agent: ['sqlAgent'],
 							'/dataSource': ['postgres'],
+						},
+					},
+				},
+				{
+					name: 'anthropicApi',
+					required: true,
+					displayOptions: {
+						show: {
+							agent: ['claudeCodeAgent'],
 						},
 					},
 				},
@@ -449,6 +470,7 @@ export class AgentV1 implements INodeType {
 				...reActAgentAgentProperties,
 				...sqlAgentAgentProperties,
 				...planAndExecuteAgentProperties,
+				claudeCodeAgentProperties,
 			],
 		};
 	}
@@ -469,6 +491,8 @@ export class AgentV1 implements INodeType {
 			return await sqlAgentAgentExecute.call(this);
 		} else if (agentType === 'planAndExecuteAgent') {
 			return await planAndExecuteAgentExecute.call(this, nodeVersion);
+		} else if (agentType === 'claudeCodeAgent') {
+			return await claudeCodeAgentExecute.call(this);
 		}
 
 		throw new NodeOperationError(this.getNode(), `The agent type "${agentType}" is not supported`);
